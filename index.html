@@ -6,6 +6,9 @@
 <meta name="color-scheme" content="light dark">
 <meta name="description" content="Arayik Sargsyan, IT Support Specialist with 5+ years in technical support, SaaS support, and customer success. Based in Yerevan, Armenia.">
 <title>Arayik Sargsyan | IT Support Specialist</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="favicon.png">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Person", "name": "Arayik Sargsyan", "jobTitle": "IT Support Specialist", "description": "IT and SaaS support specialist with 5+ years in technical support and customer success. Senior Product Support Specialist at Aderant. Based in Yerevan, Armenia.", "url": "https://arayik1996.github.io/", "image": "https://arayik1996.github.io/og-image.png", "address": {"@type": "PostalAddress", "addressLocality": "Yerevan", "addressCountry": "AM"}, "worksFor": {"@type": "Organization", "name": "Aderant"}, "alumniOf": [{"@type": "CollegeOrUniversity", "name": "University of Jordan"}, {"@type": "CollegeOrUniversity", "name": "Yerevan State University"}], "knowsLanguage": ["hy", "en", "ru", "ar"], "knowsAbout": ["Technical support", "SaaS platform support", "Customer success", "Salesforce Service Cloud", "Zendesk", "Knowledge base management"], "sameAs": ["https://www.linkedin.com/in/arayik-sargsyan", "https://github.com/Arayik1996"]}</script>
 <link rel="canonical" href="https://arayik1996.github.io/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Arayik Sargsyan">
@@ -552,6 +555,18 @@ footer{border-top:1px solid var(--line);padding:30px 0 40px;color:var(--muted);f
 .about-copy .id-loc{color:var(--muted);font-size:.95rem;margin-top:2px}
 @media (max-width:420px){.portrait{width:120px;height:120px}.about-copy .about-id{gap:18px}.about-copy .id-name{font-size:1.35rem}}
 
+
+/* Quick facts */
+.facts-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:28px 24px;margin:60px 0 0;padding:0;list-style:none}
+.facts-strip li{position:relative;padding-top:18px;border-top:1px solid var(--line-2);--c:var(--olive)}
+.facts-strip li::before{content:"";position:absolute;left:0;top:-2px;width:40px;height:3px;background:var(--c)}
+.facts-strip li:nth-child(2){--c:var(--navy)}
+.facts-strip li:nth-child(3){--c:var(--steel)}
+.facts-strip li:nth-child(4){--c:var(--sand)}
+.facts-strip .num{display:block;font-family:var(--display);font-weight:800;font-size:2.2rem;line-height:1.05;letter-spacing:-.02em;color:var(--text)}
+.facts-strip .lbl{display:block;margin-top:6px;color:var(--muted);font-size:.93rem;line-height:1.45;max-width:17em}
+@media (max-width:760px){.facts-strip{grid-template-columns:1fr 1fr;margin-top:44px}.facts-strip .num{font-size:1.9rem}}
+
 /* Interactive background */
 #bgNet{position:fixed;inset:0;width:100%;height:100%;z-index:-1;pointer-events:none;display:block}
 .link-btn{background:none;border:0;padding:0;font:inherit;color:var(--navy-t);cursor:pointer;text-decoration:underline;text-underline-offset:3px}
@@ -638,6 +653,15 @@ dialog#trailerDialog::backdrop{background:rgba(10,20,36,.72);backdrop-filter:blu
           <button class="chip" data-cmd="ping arayik">ping arayik</button>
         </div>
       </div>
+    </div>
+
+    <div class="wrap">
+      <ul class="facts-strip" aria-label="Key facts">
+        <li><strong class="num">5+</strong><span class="lbl">years in technical support and customer success</span></li>
+        <li><strong class="num">90%</strong><span class="lbl">first-call resolution at Krisp</span></li>
+        <li><strong class="num">98%</strong><span class="lbl">customer satisfaction at Krisp</span></li>
+        <li><strong class="num">4</strong><span class="lbl">languages: Armenian, English, Russian, Arabic</span></li>
+      </ul>
     </div>
   </section>
 
@@ -802,11 +826,11 @@ dialog#trailerDialog::backdrop{background:rgba(10,20,36,.72);backdrop-filter:blu
               <span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></span>
               <span><strong>Email</strong><small data-text="email">sargsyanarayik1@gmail.com</small></span>
             </a>
-            <a class="link-row" data-link="linkedin" href="https://www.linkedin.com/in/arayik-sargsyan" target="_blank" rel="noopener noreferrer">
+            <a class="link-row" data-link="linkedin" href="https://www.linkedin.com/in/arayik-sargsyan" target="_blank" rel="me noopener noreferrer">
               <span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4.98 3.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5ZM3 9.75h4v11.5H3V9.75Zm6.5 0h3.83v1.57h.06c.53-1 1.84-2.07 3.78-2.07 4.04 0 4.78 2.66 4.78 6.12v5.88h-4v-5.2c0-1.24-.02-2.84-1.73-2.84-1.73 0-2 1.35-2 2.75v5.29h-4V9.75Z"/></svg></span>
               <span><strong>LinkedIn</strong><small>linkedin.com/in/arayik-sargsyan</small></span>
             </a>
-            <a class="link-row" data-link="github" href="https://github.com/Arayik1996" target="_blank" rel="noopener noreferrer">
+            <a class="link-row" data-link="github" href="https://github.com/Arayik1996" target="_blank" rel="me noopener noreferrer">
               <span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.1-1.47-1.1-1.47-.9-.62.07-.6.07-.6 1 .07 1.52 1.03 1.52 1.03.89 1.52 2.34 1.08 2.9.83.09-.64.35-1.08.63-1.33-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.9-1.29 2.74-1.02 2.74-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 12 2Z"/></svg></span>
               <span><strong>GitHub</strong><small>github.com/Arayik1996</small></span>
             </a>
