@@ -1,3 +1,4 @@
 {
-  "backgroundAnimation": "off"
+  "backgroundAnimation": "on",
+  "backgroundStyle": "contour"
 }

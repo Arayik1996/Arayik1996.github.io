@@ -1152,14 +1152,35 @@ dialog#trailerDialog::backdrop{background:rgba(10,20,36,.72);backdrop-filter:blu
     if (userChoice === "on" || userChoice === "off") enabled = userChoice === "on";
     if (reduce) enabled = false;                       // reduced motion: draw one still frame only
 
-    // Site-wide default, set by editing settings.json in the repository. Falls back to "on".
+    // Two looks. "calm" (default) is quiet: fewer, fainter, slower dots that fade as you scroll.
+    // "lively" is the original, more visible version. Chosen in settings.json.
+    const STYLES = {
+      // Dot-free looks. "glow": large soft colour washes drifting very slowly. "contour": thin topographic lines.
+      glow:    { kind: "glow", scrollMin: 0.65 },
+      contour: { kind: "contour", scrollMin: 0.55, line: { dark: 0.13, light: 0.12 }, index: { dark: 0.26, light: 0.24 } },
+      calm:   { kind: "network", perPx: 23000, perPxSmall: 30000, min: 20, max: 62, speed: 0.5, cap: 0.26, pull: 0.004,
+                link: { dark: 0.28, light: 0.24 }, node: { dark: 0.52, light: 0.46 }, rScale: 0.85,
+                ptrLink: { dark: 0.30, light: 0.28 }, ptrGlow: { dark: 0.09, light: 0.11 }, ring: 0.16, scrollMin: 0.5 },
+      lively: { kind: "network", perPx: 15500, perPxSmall: 22000, min: 28, max: 95, speed: 1, cap: 0.55, pull: 0.012,
+                link: { dark: 0.36, light: 0.34 }, node: { dark: 0.70, light: 0.62 }, rScale: 1,
+                ptrLink: { dark: 0.60, light: 0.55 }, ptrGlow: { dark: 0.16, light: 0.20 }, ring: 0.28, scrollMin: 1 }
+    };
+    const DEFAULT_STYLE = "contour";
+    let styleName = DEFAULT_STYLE, S = STYLES[DEFAULT_STYLE];
+
+    // Site-wide settings, set by editing settings.json in the repository. Falls back to calm + on.
     function siteSetting() {
       return new Promise(resolve => {
-        const t = setTimeout(() => resolve(true), 1500);
+        const fallback = { on: true, style: DEFAULT_STYLE };
+        const t = setTimeout(() => resolve(fallback), 1500);
         fetch("settings.json", { cache: "no-store" })
           .then(r => (r.ok ? r.json() : Promise.reject()))
-          .then(j => { clearTimeout(t); resolve(String(j.backgroundAnimation).toLowerCase() !== "off"); })
-          .catch(() => { clearTimeout(t); resolve(true); });
+          .then(j => {
+            clearTimeout(t);
+            resolve({ on: String(j.backgroundAnimation).toLowerCase() !== "off",
+                      style: STYLES[String(j.backgroundStyle).toLowerCase()] ? String(j.backgroundStyle).toLowerCase() : DEFAULT_STYLE });
+          })
+          .catch(() => { clearTimeout(t); resolve(fallback); });
       });
     }
     const mouse = { x: -9999, y: -9999, active: false };
@@ -1183,48 +1204,62 @@ dialog#trailerDialog::backdrop{background:rgba(10,20,36,.72);backdrop-filter:blu
     }
 
     function targetCount() {
-      const n = Math.round((W * H) / (W < 700 ? 22000 : 15500));
-      return Math.max(28, Math.min(n, 95));
+      const n = Math.round((W * H) / (W < 700 ? S.perPxSmall : S.perPx));
+      return Math.max(S.min, Math.min(n, S.max));
     }
     function makeNode() {
       const a = Math.random() * Math.PI * 2, sp = 0.12 + Math.random() * 0.22;
       return { x: Math.random() * W, y: Math.random() * H, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
-               r: 1.5 + Math.random() * 1.7, k: ["olive", "navy", "steel", "olive", "sand"][(Math.random() * 5) | 0], glow: 0 };
+               r: (1.5 + Math.random() * 1.7) * S.rScale, k: ["olive", "navy", "steel", "olive", "sand"][(Math.random() * 5) | 0], glow: 0 };
     }
+    // Grid used by the contour look
+    let cell = 16, cols = 0, rows = 0, fld = null;
     function resize() {
       W = window.innerWidth; H = window.innerHeight;
-      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      dpr = S.kind === "glow" ? 1 : Math.min(window.devicePixelRatio || 1, 2);   // soft washes don't need sharp pixels
       cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      const t = targetCount();
-      while (nodes.length < t) nodes.push(makeNode());
-      if (nodes.length > t) nodes.length = t;
-      nodes.forEach(n => { n.x = Math.min(n.x, W); n.y = Math.min(n.y, H); });
+      if (S.kind === "network") {
+        const t = targetCount();
+        while (nodes.length < t) nodes.push(makeNode());
+        if (nodes.length > t) nodes.length = t;
+        nodes.forEach(n => { n.x = Math.min(n.x, W); n.y = Math.min(n.y, H); });
+      } else { nodes = []; }
+      if (S.kind === "contour") {
+        cell = W < 700 ? 14 : 16;
+        cols = Math.ceil(W / cell) + 1; rows = Math.ceil(H / cell) + 1;
+        fld = new Float32Array((cols + 1) * (rows + 1));
+      }
       if (!raf) draw(0);
     }
 
+    let mx = 0, my = 0, mAmt = 0;                       // eased pointer used by the dot-free looks
     function step(dt) {
+      if (mouse.active && mAmt < 0.02) { mx = mouse.x; my = mouse.y; }
+      mAmt += ((mouse.active ? 1 : 0) - mAmt) * Math.min(1, 0.05 * dt);
+      mx += (mouse.x - mx) * Math.min(1, 0.07 * dt); my += (mouse.y - my) * Math.min(1, 0.07 * dt);
+      if (S.kind !== "network") return;
       const R = 190;
       for (const n of nodes) {
         if (mouse.active) {                             // gentle pull toward the pointer
           const dx = mouse.x - n.x, dy = mouse.y - n.y, d = Math.hypot(dx, dy);
-          if (d < R && d > 1) { const f = (1 - d / R) * 0.012 * dt; n.vx += (dx / d) * f; n.vy += (dy / d) * f; }
+          if (d < R && d > 1) { const f = (1 - d / R) * S.pull * dt; n.vx += (dx / d) * f; n.vy += (dy / d) * f; }
         }
         let sp = Math.hypot(n.vx, n.vy);
-        if (sp > 0.55) { n.vx *= 0.55 / sp; n.vy *= 0.55 / sp; }          // cap speed
+        if (sp > S.cap) { n.vx *= S.cap / sp; n.vy *= S.cap / sp; }        // cap speed
         else if (sp < 0.1) { n.vx *= 1.02; n.vy *= 1.02; }                  // keep drifting
         n.vx *= 0.9985; n.vy *= 0.9985;
-        n.x += n.vx * dt; n.y += n.vy * dt;
+        n.x += n.vx * dt * S.speed; n.y += n.vy * dt * S.speed;
         if (n.x < -10) n.x = W + 10; else if (n.x > W + 10) n.x = -10;
         if (n.y < -10) n.y = H + 10; else if (n.y > H + 10) n.y = -10;
       }
     }
 
-    function draw(now) {
+    function drawNetwork(now) {
       ctx.clearRect(0, 0, W, H);
       const L = W < 700 ? 110 : 150, dark = C.dark;
       const lineC = dark ? C.steel : C.navy;
-      const base = dark ? 0.36 : 0.34;
+      const base = dark ? S.link.dark : S.link.light;
       const maxR = Math.hypot(W, H) + 80;
 
       // glow from pings: nodes near an expanding ring light up
@@ -1241,7 +1276,7 @@ dialog#trailerDialog::backdrop{background:rgba(10,20,36,.72);backdrop-filter:blu
       // soft light under the pointer
       if (mouse.active) {
         const gr = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, 260);
-        gr.addColorStop(0, rgba(C.olive, dark ? 0.16 : 0.20)); gr.addColorStop(1, rgba(C.olive, 0));
+        gr.addColorStop(0, rgba(C.olive, dark ? S.ptrGlow.dark : S.ptrGlow.light)); gr.addColorStop(1, rgba(C.olive, 0));
         ctx.fillStyle = gr; ctx.fillRect(mouse.x - 260, mouse.y - 260, 520, 520);
       }
 
@@ -1265,7 +1300,7 @@ dialog#trailerDialog::backdrop{background:rgba(10,20,36,.72);backdrop-filter:blu
         for (const n of nodes) {
           const d = Math.hypot(n.x - mouse.x, n.y - mouse.y);
           if (d < 185) {
-            ctx.strokeStyle = rgba(C.olive, (1 - d / 185) * (dark ? 0.6 : 0.55));
+            ctx.strokeStyle = rgba(C.olive, (1 - d / 185) * (dark ? S.ptrLink.dark : S.ptrLink.light));
             ctx.beginPath(); ctx.moveTo(mouse.x, mouse.y); ctx.lineTo(n.x, n.y); ctx.stroke();
           }
         }
@@ -1276,7 +1311,7 @@ dialog#trailerDialog::backdrop{background:rgba(10,20,36,.72);backdrop-filter:blu
       // ping rings
       for (const p of pulses) {
         const rad = Math.max(0, now - p.t0) * 0.55;
-        ctx.strokeStyle = rgba(C.olive, 0.28 * (1 - rad / maxR));
+        ctx.strokeStyle = rgba(C.olive, S.ring * (1 - rad / maxR));
         ctx.lineWidth = 1.5;
         ctx.beginPath(); ctx.arc(p.x, p.y, rad, 0, 6.283); ctx.stroke();
       }
@@ -1288,9 +1323,88 @@ dialog#trailerDialog::backdrop{background:rgba(10,20,36,.72);backdrop-filter:blu
           ctx.fillStyle = rgba(C.olive, 0.22 * n.glow);
           ctx.beginPath(); ctx.arc(n.x, n.y, n.r + 9 * n.glow, 0, 6.283); ctx.fill();
         }
-        ctx.fillStyle = rgba(col, Math.min(1, (dark ? 0.7 : 0.62) + n.glow * 0.4));
+        ctx.fillStyle = rgba(col, Math.min(1, (dark ? S.node.dark : S.node.light) + n.glow * 0.4));
         ctx.beginPath(); ctx.arc(n.x, n.y, n.r + n.glow * 2, 0, 6.283); ctx.fill();
       }
+    }
+
+    // ---- glow: big soft colour washes that drift very slowly; a faint light follows the pointer
+    const ORBS = [
+      { k: "olive", a: [0.22, 0.15], r: 0.55, sx: 0.8, sy: 1.0, px: 0.0, py: 1.3 },
+      { k: "navy",  a: [0.16, 0.24], r: 0.62, sx: 1.0, sy: 0.7, px: 2.1, py: 0.4 },
+      { k: "sand",  a: [0.20, 0.12], r: 0.50, sx: 0.6, sy: 0.9, px: 4.0, py: 2.5 },
+      { k: "steel", a: [0.14, 0.18], r: 0.55, sx: 0.9, sy: 1.2, px: 1.0, py: 3.3 },
+      { k: "olive", a: [0.12, 0.10], r: 0.45, sx: 1.1, sy: 0.8, px: 5.2, py: 5.0 }
+    ];
+    function drawGlow(now) {
+      ctx.clearRect(0, 0, W, H);
+      const t = now * 0.00004, dark = C.dark, big = Math.max(W, H);
+      for (const o of ORBS) {
+        const x = W * (0.5 + 0.42 * Math.sin(t * o.sx + o.px)), y = H * (0.5 + 0.40 * Math.sin(t * o.sy + o.py)), r = big * o.r;
+        const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+        g.addColorStop(0, rgba(C[o.k], dark ? o.a[1] : o.a[0])); g.addColorStop(1, rgba(C[o.k], 0));
+        ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2);
+      }
+      if (mAmt > 0.01) {
+        const g = ctx.createRadialGradient(mx, my, 0, mx, my, 340);
+        g.addColorStop(0, rgba(C.olive, (dark ? 0.12 : 0.15) * mAmt)); g.addColorStop(1, rgba(C.olive, 0));
+        ctx.fillStyle = g; ctx.fillRect(mx - 340, my - 340, 680, 680);
+      }
+    }
+
+    // ---- contour: thin topographic lines from a slowly changing landscape; the pointer raises a gentle hill
+    const LEVELS = []; for (let L = -4.0; L <= 4.05; L += 0.5) LEVELS.push(L);
+    function drawContour(now) {
+      ctx.clearRect(0, 0, W, H);
+      const t = now * 0.00006, dark = C.dark, nx = cols + 1;
+      pulses = pulses.filter(p => now - p.t0 < 5000);
+      const hill = mAmt > 0.01, k2 = 1 / (2 * 150 * 150);
+      for (let j = 0; j <= rows; j++) {
+        for (let i = 0; i <= cols; i++) {
+          const x = i * cell, y = j * cell;
+          let v = Math.sin(x * 0.0105 + t * 0.9) + Math.sin(y * 0.0140 - t * 0.7) + Math.sin((x + y) * 0.0082 + t * 0.5)
+                + 0.8 * Math.sin(Math.hypot(x - W * 0.7, y - H * 0.3) * 0.0130 - t * 0.6) + 0.6 * Math.sin((x - y) * 0.0185 + t * 0.4)
+                + 0.4 * Math.sin(x * 0.0290 - y * 0.0210 + t * 0.8);
+          if (hill) { const dx = x - mx, dy = y - my; v += 1.7 * mAmt * Math.exp(-(dx * dx + dy * dy) * k2); }
+          for (const p of pulses) {
+            const age = Math.max(0, now - p.t0), d = Math.hypot(x - p.x, y - p.y) - age * 0.33;
+            v += Math.exp(-(d * d) / 4050) * Math.exp(-age / 1700);
+          }
+          fld[j * nx + i] = v;
+        }
+      }
+      ctx.lineWidth = 1;
+      for (let li = 0; li < LEVELS.length; li++) {
+        const L = LEVELS[li], isIndex = li % 4 === 0;
+        ctx.strokeStyle = isIndex ? rgba(C.olive, dark ? S.index.dark : S.index.light) : rgba(dark ? C.steel : C.navy, dark ? S.line.dark : S.line.light);
+        ctx.beginPath();
+        for (let j = 0; j < rows; j++) {
+          for (let i = 0; i < cols; i++) {
+            const q = j * nx + i, a = fld[q], b = fld[q + 1], c = fld[q + nx + 1], d = fld[q + nx];
+            const idx = (a > L ? 1 : 0) | (b > L ? 2 : 0) | (c > L ? 4 : 0) | (d > L ? 8 : 0);
+            if (idx === 0 || idx === 15) continue;
+            const x = i * cell, y = j * cell;
+            const tx = x + cell * (L - a) / (b - a), rY = y + cell * (L - b) / (c - b);
+            const bx = x + cell * (L - d) / (c - d), lY = y + cell * (L - a) / (d - a);
+            switch (idx) {
+              case 1: case 14: ctx.moveTo(x, lY); ctx.lineTo(tx, y); break;
+              case 2: case 13: ctx.moveTo(tx, y); ctx.lineTo(x + cell, rY); break;
+              case 3: case 12: ctx.moveTo(x, lY); ctx.lineTo(x + cell, rY); break;
+              case 4: case 11: ctx.moveTo(x + cell, rY); ctx.lineTo(bx, y + cell); break;
+              case 6: case 9:  ctx.moveTo(tx, y); ctx.lineTo(bx, y + cell); break;
+              case 7: case 8:  ctx.moveTo(x, lY); ctx.lineTo(bx, y + cell); break;
+              case 5:  ctx.moveTo(x, lY); ctx.lineTo(tx, y); ctx.moveTo(x + cell, rY); ctx.lineTo(bx, y + cell); break;
+              case 10: ctx.moveTo(tx, y); ctx.lineTo(x + cell, rY); ctx.moveTo(x, lY); ctx.lineTo(bx, y + cell); break;
+            }
+          }
+        }
+        ctx.stroke();
+      }
+    }
+    function draw(now) {
+      if (S.kind === "glow") drawGlow(now);
+      else if (S.kind === "contour") drawContour(now);
+      else drawNetwork(now);
     }
 
     function frame(now) {
@@ -1308,13 +1422,27 @@ dialog#trailerDialog::backdrop{background:rgba(10,20,36,.72);backdrop-filter:blu
       if (on) start(); else { stop(); pulses = []; mouse.active = false; draw(0); }
     }
 
+    function applyStyle(name) {
+      if (!STYLES[name] || name === styleName) return;
+      styleName = name; S = STYLES[name];
+      nodes = []; resize();                            // rebuild the dots for the new look
+      fadeOnScroll();
+    }
+    // Calm mode lets the background recede as you read further down the page.
+    function fadeOnScroll() {
+      const k = Math.min(1, window.scrollY / (window.innerHeight * 1.2));
+      cv.style.opacity = String(1 - (1 - S.scrollMin) * k);
+    }
+    window.addEventListener("scroll", fadeOnScroll, { passive: true });
+
     readColors();
     resize();
+    fadeOnScroll();
     window.addEventListener("resize", resize);
     document.addEventListener("visibilitychange", () => { if (document.hidden) stop(); else start(); });
     new MutationObserver(() => { readColors(); if (!raf) draw(0); }).observe(root, { attributes: true, attributeFilter: ["data-theme"] });
 
-    if (reduce) { if (toggle) toggle.hidden = true; draw(0); return; }   // still frame, no interaction
+    if (reduce) { if (toggle) toggle.hidden = true; siteSetting().then(cfg => applyStyle(cfg.style)); draw(0); return; }   // still frame, no interaction
 
     window.addEventListener("pointermove", e => { mouse.x = e.clientX; mouse.y = e.clientY; mouse.active = enabled; }, { passive: true });
     document.documentElement.addEventListener("mouseleave", () => { mouse.active = false; });
@@ -1329,12 +1457,12 @@ dialog#trailerDialog::backdrop{background:rgba(10,20,36,.72);backdrop-filter:blu
     window.addEventListener("pointerup", e => { if (e.pointerType === "touch") mouse.active = false; }, { passive: true });
 
     if (toggle) toggle.addEventListener("click", () => setEnabled(!enabled, true));
-    if (userChoice === "on" || userChoice === "off") {
-      setEnabled(enabled, false);                      // this visitor already chose: respect it
-    } else {
-      setEnabled(false, false);                        // still frame while the site setting loads
-      siteSetting().then(on => setEnabled(on, false));
-    }
+    setEnabled(false, false);                          // still frame while the site settings load
+    siteSetting().then(cfg => {
+      applyStyle(cfg.style);
+      const visitorChose = userChoice === "on" || userChoice === "off";
+      setEnabled(visitorChose ? userChoice === "on" : cfg.on, false);   // a visitor's own choice wins over the site default
+    });
   })();
 
   /* ================================================================
